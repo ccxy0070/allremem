@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:aop="http://www.springframework.org/schema/aop"
+	xmlns:tx="http://www.springframework.org/schema/tx" xmlns:context="http://www.springframework.org/schema/context"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-4.0.xsd
+   http://www.springframework.org/schema/aop http://www.springframework.org/schema/aop/spring-aop-4.0.xsd
+   http://www.springframework.org/schema/tx http://www.springframework.org/schema/tx/spring-tx-4.0.xsd
+   http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-4.0.xsd">
+
+	<!-- 基于Druid数据库链接池的数据源基本配置 -->
+	<bean id="dataSource" class="com.alibaba.druid.pool.DruidDataSource" init-method="init" destroy-method="close">
+		<!-- 基本属性driverClassName、 url、user、password -->
+		<property name="driverClassName" value="com.mysql.jdbc.Driver" />
+		<property name="url" value="${jdbc.url}" />
+		<property name="username" value="${jdbc.username}" />
+		<property name="password" value="${jdbc.password}" />
+		<!-- 配置初始化大小、最小、最大 -->
+		<!-- 通常来说，只需要修改initialSize、minIdle、maxActive -->
+		<property name="initialSize" value="2" />
+		<property name="minIdle" value="2" />
+		<property name="maxActive" value="30" />
+		<property name="testWhileIdle" value="false" />
+
+		<!-- 配置获取连接等待超时的时间 -->
+		<property name="maxWait" value="5000" />
+		<!-- 配置一个连接在池中最小生存的时间，单位是毫秒 -->
+		<property name="minEvictableIdleTimeMillis" value="30000" />
+		<!-- 配置间隔多久才进行一次检测，检测需要关闭的空闲连接，单位是毫秒 -->
+		<property name="timeBetweenEvictionRunsMillis" value="60000" />
+		<!-- 解密密码必须要配置的项 <property name="filters" value="config" /> <property name="connectionProperties" 
+			value="config.decrypt=true" /> -->
+		<!--这里使用了mergeStat 只在把没有参数化而参数不同的sql进行合并 如果不使用mergeStat 在有大量sql的时候可能导致OOM 
+			另外一个避免oom的方法是设置一个时间间隔将内存中的信息刷到日志 参见 https://github.com/alibaba/druid/wiki/%E6%80%8E%E4%B9%88%E4%BF%9D%E5%AD%98Druid%E7%9A%84%E7%9B%91%E6%8E%A7%E8%AE%B0%E5%BD%95 -->
+		<property name="filters" value="mergeStat" /><!--开启此filter默认开启分表语句合并 :如 insert into xx_0 insert into xx_1 会合并成 insert into xx 关闭配置需配置虚拟机参数druid.parameterized.shardingSupport=false -->
+		<property name="validationQuery">
+			<value>SELECT 1</value>
+		</property>
+
+		<property name="testOnBorrow">
+			<value>false</value>
+		</property>
+		<property name="testOnReturn">
+			<value>false</value>
+		</property>
+
+		<!--设置慢查询sql的阀值 单位是毫秒 -->
+		<property name="connectionProperties" value="druid.stat.slowSqlMillis=200" />
+		<property name="poolPreparedStatements">
+			<value>false</value>
+		</property>
+		<property name="useGlobalDataSourceStat" value="false" />
+		<!-- 连接泄漏监测 -->
+		<property name="removeAbandoned" value="true" /> <!-- 打开removeAbandoned功能 -->
+		<property name="removeAbandonedTimeout" value="1800" /> <!-- 1800秒，也就是30分钟 -->
+		<property name="logAbandoned" value="true" /> <!-- 关闭abanded连接时输出错误日志 -->
+
+	</bean>
+
+	<!-- 将数据源映射到sqlSessionFactory中 -->
+	<!-- <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean"> 
+		<property name="configLocation" value="classpath:mybatis/mybatis-config.xml" /> 
+		<property name="dataSource" ref="dataSource" />
+		</bean> -->
+
+	<!-- 创建SqlSessionFactory，同时指定数据源 -->
+	<bean id="sqlSessionFactory" class="cn.ar.allremem.common.PackagesSqlSessionFactoryBean">
+		<!-- 指定mybatis-config.xml总配置文件，订制的environment在spring容器中不在生效 -->
+		<property name="configLocation" value="classpath:mybatis/mybatis-config.xml"></property>
+		<!-- 配置实体映射别名在*.xml中直接使用类名即可 -->
+		<property name="typeAliasesPackage" value="cn.ar.allremem.basics.**.entity" />
+		<!-- 自动扫描entity目录, 省掉Configuration.xml里的手工配置 -->
+		<property name="mapperLocations" value="classpath*:mybatis/mapper/*.Mapper.xml" />
+		<!-- 指定数据源 -->
+		<property name="dataSource" ref="dataSource" />
+	</bean>
+
+	<!--使用MapperScannerConfigurer查 找 类 路 径 下 的 映 射 器 并 自 动 将 它 们 创 建 成 MapperFactoryBean,来生成Mapper接口的代理 -->
+	<!--<bean class="org.mybatis.spring.mapper.MapperScannerConfigurer"> 
+		<property name="sqlSessionFactoryBeanName" value="sqlSessionFactory" /> 
+		<property name="basePackage" value="com.cic.sys.dao,com.cic.jdjh.dao" /> 
+		<property name="basePackage" value="com.cic.**.dao*" /> 
+		</bean> -->
+	<!-- SqlSession模板类实例 -->
+	<bean id="sessionTemplate" class="org.mybatis.spring.SqlSessionTemplate" destroy-method="close">
+		<constructor-arg index="0" ref="sqlSessionFactory" />
+	</bean>
+
+	<!--======= 事务配置 Begin ================= -->
+	<!-- 事务管理器（由Spring管理MyBatis的事务） -->
+	<bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+		<!-- 关联数据源 -->
+		<property name="dataSource" ref="dataSource"></property>
+	</bean>
+	<!-- 使用注解事务 -->
+	<tx:annotation-driven transaction-manager="transactionManager" />
+	<!--======= 事务配置 End =================== -->
+
+	<bean id="druid-stat-interceptor" class="com.alibaba.druid.support.spring.stat.DruidStatInterceptor"></bean>
+	<bean id="druid-stat-pointcut" class="org.springframework.aop.support.JdkRegexpMethodPointcut" scope="prototype">
+		<property name="patterns">
+			<list>
+				<value>cn.ar.*.common.core.dao.*</value>
+				<value>cn.ar.*.service.biz.*</value>
+				<value>cn.ar.*.service.dao.*</value>
+				<!-- cn.ar.*.service.impl.* -->
+			</list>
+		</property>
+	</bean>
+	<aop:config>
+		<aop:advisor advice-ref="druid-stat-interceptor" pointcut-ref="druid-stat-pointcut" />
+	</aop:config>
+</beans>

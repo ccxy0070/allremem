@@ -1,0 +1,23 @@
+version 1.1 zhangxy 2017-05-16
+1.druid监控页面地址: http://127.0.0.1:8080/service/druid/login.html
+  username:druid ; password:druid 注意:在线上版本发布时需要把密码加密修改
+2.修改升级swagger UI 版本为中文版本
+3.去掉 logback 新老版本标签弃用问题 出现的error
+4.增加logback mybatis showsql显示打印，线上版本需要去掉,只做debug调试
+
+version 1.0 zhangxy 2017-05-01
+1.本框架采用 mybatis+spring+springmvc+druid+swagger+restfull 方式搭建
+2.数据源为mybatis+druid(可配置orcale,mysql,sqlserver等)
+3.事物交给spring管理
+4.前端架构为springmvc
+5.接口文档生成为swagger框架
+	开发接入接口地址：http://ip:port/service/index.html
+	如果需要变动IP需要修改/xxxproject is name/web/index.html文件下的
+	function requestUrl() {
+		//var key = $("#key").val();
+		//使用IP访问，如本地测试使用127.0.0.1 否则出现跨域问题
+		var url ="http://127.0.0.1:8080/service/api-docs";
+		getDocument(url);
+		return false;
+	};
+
